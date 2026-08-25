@@ -1,0 +1,131 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="920" viewBox="0 0 1600 920" role="img" aria-labelledby="title desc">
+  <!-- Review-only asset for the Qwen4 PLE/offload blog section. -->
+  <title id="title">Qwen4 PLE architecture and sparse pinned-host offload</title>
+  <desc id="desc">The top panel shows token history hashed into sixteen N-gram embedding heads, followed by branch-aware gating, short convolution, residual injection, and Hyper-Connection mixing. The bottom panel shows a vocabulary-parallel PLE shard in pinned host memory read through a sparse UVA gather overlapped with the preceding decoder layer.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7fbfa"/>
+      <stop offset="1" stop-color="#edf6f3"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dff6ea"/>
+      <stop offset="1" stop-color="#c8eedc"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eee8ff"/>
+      <stop offset="1" stop-color="#ddd2ff"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e5f4ff"/>
+      <stop offset="1" stop-color="#cce9fb"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-20%" width="120%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#12352b" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5.5 L0,11 Z" fill="#52736a"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="11" markerHeight="11" refX="9" refY="5.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5.5 L0,11 Z" fill="#7558b9"/>
+    </marker>
+    <style>
+      .title { font: 700 34px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #102a24; }
+      .subtitle { font: 500 18px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #58736b; }
+      .panel-title { font: 700 23px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #173e34; }
+      .box-title { font: 700 18px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #183b32; }
+      .body { font: 500 15px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #557168; }
+      .mono { font: 600 14px "SFMono-Regular", Consolas, monospace; fill: #2d6658; }
+      .mono-purple { font: 600 14px "SFMono-Regular", Consolas, monospace; fill: #684ba8; }
+      .mono-purple-small { font: 600 12px "SFMono-Regular", Consolas, monospace; fill: #684ba8; }
+      .tag { font: 700 13px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 1px; fill: #3a7464; }
+      .arrow { stroke: #52736a; stroke-width: 3; fill: none; marker-end: url(#arrow); }
+      .arrow-purple { stroke: #7558b9; stroke-width: 3; fill: none; marker-end: url(#arrowPurple); }
+      .dash { stroke-dasharray: 9 8; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="920" rx="28" fill="url(#bg)"/>
+  <text x="70" y="68" class="title">Qwen4 Per-Layer Embeddings: sparse memory, branch-aware injection</text>
+  <text x="70" y="100" class="subtitle">Checkpoint contract: PLE at decoder layer 2 · 4 Hyper-Connection branches · BF16 · 48 decoder layers</text>
+
+  <rect x="55" y="135" width="1490" height="445" rx="24" fill="#ffffff" stroke="#cfe1dc" stroke-width="2" filter="url(#shadow)"/>
+  <text x="85" y="180" class="panel-title">1 · Model dataflow</text>
+
+  <rect x="85" y="220" width="220" height="142" rx="16" fill="url(#blue)" stroke="#91c7e4" stroke-width="2"/>
+  <text x="108" y="254" class="tag">TOKEN CONTEXT</text>
+  <text x="108" y="289" class="box-title">2-gram + 3-gram</text>
+  <text x="108" y="320" class="body">current token and</text>
+  <text x="108" y="343" class="body">two-token history</text>
+
+  <path d="M305 291 H355" class="arrow"/>
+
+  <rect x="360" y="220" width="245" height="142" rx="16" fill="url(#green)" stroke="#7fc6a6" stroke-width="2"/>
+  <text x="383" y="254" class="tag">HASH + LOOKUP</text>
+  <text x="383" y="289" class="box-title">16 independent heads</text>
+  <text x="383" y="320" class="body">8 heads per N-gram order</text>
+  <text x="383" y="343" class="mono">16 × 160 → E[2560]</text>
+
+  <path d="M605 291 H655" class="arrow"/>
+
+  <rect x="660" y="205" width="292" height="172" rx="16" fill="url(#violet)" stroke="#a78bdc" stroke-width="2"/>
+  <text x="683" y="239" class="tag">BRANCH-AWARE GATE</text>
+  <text x="683" y="274" class="box-title">PLE embedding → K, V</text>
+  <text x="683" y="305" class="body">HC state → 4 branch queries</text>
+  <text x="683" y="330" class="mono-purple-small">s₍c₎ = 〈Norm K₍c₎, Norm Q₍c₎〉 / √2560</text>
+  <text x="683" y="349" class="mono-purple-small">g₍c₎ = σ(sign(s₍c₎) · √|s₍c₎|)</text>
+  <text x="683" y="368" class="mono-purple-small">U₍c₎ = g₍c₎ · V</text>
+
+  <path d="M952 291 H1002" class="arrow"/>
+
+  <rect x="1007" y="220" width="230" height="142" rx="16" fill="#fff4dc" stroke="#e5bd66" stroke-width="2"/>
+  <text x="1030" y="254" class="tag" fill="#9a6d13">SHORT CONV</text>
+  <text x="1030" y="289" class="box-title">Depthwise Conv1D</text>
+  <text x="1030" y="320" class="mono">kernel=4 · dilation=3</text>
+  <text x="1030" y="343" class="body">persistent state length 9</text>
+
+  <path d="M1237 291 H1287" class="arrow"/>
+
+  <rect x="1292" y="205" width="220" height="172" rx="16" fill="#e5f6ee" stroke="#72bd9b" stroke-width="2"/>
+  <text x="1315" y="239" class="tag">RESIDUAL INJECTION</text>
+  <text x="1315" y="274" class="box-title">Add to HC state</text>
+  <text x="1315" y="305" class="mono">[tokens, 4, 2560]</text>
+  <text x="1315" y="334" class="body">then HC mix → GDN</text>
+  <text x="1315" y="357" class="body">working stream [2560]</text>
+
+  <rect x="355" y="410" width="890" height="118" rx="16" fill="#f8fbfa" stroke="#cadbd6" stroke-width="2"/>
+  <text x="382" y="444" class="box-title">Why the table dominates memory</text>
+  <text x="382" y="476" class="body">16 prime-sized vocabularies near 20M rows/head = 320,001,536 rows total</text>
+  <text x="382" y="505" class="mono">320,001,536 × 160 × 2 bytes ≈ 95.4 GiB BF16 · only 16 rows read per token</text>
+
+  <rect x="55" y="610" width="1490" height="255" rx="24" fill="#ffffff" stroke="#cfe1dc" stroke-width="2" filter="url(#shadow)"/>
+  <text x="85" y="655" class="panel-title">2 · SGLang sparse pinned-host offload</text>
+
+  <rect x="90" y="700" width="340" height="120" rx="16" fill="url(#violet)" stroke="#a78bdc" stroke-width="2"/>
+  <text x="115" y="734" class="tag">PINNED HOST MEMORY</text>
+  <text x="115" y="768" class="box-title">Vocabulary-parallel PLE shard</text>
+  <text x="115" y="798" class="mono-purple">TP4: ~23.84 GiB table/rank</text>
+
+  <path d="M430 760 H555" class="arrow-purple"/>
+  <text x="455" y="735" class="mono-purple">UVA reads</text>
+
+  <rect x="560" y="700" width="310" height="120" rx="16" fill="url(#green)" stroke="#7fc6a6" stroke-width="2"/>
+  <text x="585" y="734" class="tag">DEDICATED CUDA STREAM</text>
+  <text x="585" y="768" class="box-title">Sparse Triton row gather</text>
+  <text x="585" y="798" class="body">overlap with decoder layer 1</text>
+
+  <path d="M870 760 H985" class="arrow"/>
+
+  <rect x="990" y="700" width="250" height="120" rx="16" fill="url(#blue)" stroke="#91c7e4" stroke-width="2"/>
+  <text x="1015" y="734" class="tag">SMALL GPU BUFFER</text>
+  <text x="1015" y="768" class="box-title">Selected BF16 rows</text>
+  <text x="1015" y="798" class="mono">tokens × 16 × 160</text>
+
+  <path d="M1240 760 H1345" class="arrow"/>
+
+  <rect x="1350" y="700" width="160" height="120" rx="16" fill="#e5f6ee" stroke="#72bd9b" stroke-width="2"/>
+  <text x="1373" y="734" class="tag">UNCHANGED</text>
+  <text x="1373" y="768" class="box-title">TP reduce</text>
+  <text x="1373" y="798" class="body">then PLE compute</text>
+
+  <text x="80" y="895" class="subtitle">Storage optimization only: not KV-cache offload, not generic layer offload, and no change to TP/DP ownership semantics.</text>
+</svg>
